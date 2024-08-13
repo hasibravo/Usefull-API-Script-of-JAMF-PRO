@@ -1,4 +1,3 @@
-```bash
 #!/bin/bash
 # 
 # Script Name: bulk_delete_jamf_packages.sh
@@ -28,57 +27,43 @@
 
 jq=/usr/local/Management/Scripts/jq-osx-amd64
 jamfProdAPIUser="xxxx"
-jamfProdAPIPass='xxx'
-jamfProdURL="https://xxx.jamfcloud.com"
+jamfProdAPIPass='xxxx'
+jamfProdURL="https://xx.jamfcloud.com"
 
-# Number of times to run the script
-iterations=2
-# Wait time between iterations (in seconds)
-waitTime=$((1 * 60)) # 20 minutes
+echo "Requesting bearer token..."
+jamfTokenCurl=$(curl -s -u "$jamfProdAPIUser":"$jamfProdAPIPass" "$jamfProdURL"/api/v1/auth/token -X POST)
+jamfBearerToken=$(echo "$jamfTokenCurl" | $jq -r .token)
 
-for ((i=1; i<=iterations; i++)); do
-    echo "Iteration $i of $iterations"
+if [ -z "$jamfBearerToken" ]; then
+  echo "Failed to obtain bearer token. Exiting."
+  exit 1
+else
+  echo "Bearer token obtained successfully."
+fi
 
-    echo "Requesting bearer token..."
-    jamfTokenCurl=$(curl -s -u "$jamfProdAPIUser":"$jamfProdAPIPass" "$jamfProdURL/api/v1/auth/token" -X POST)
-    jamfBearerToken=$(echo "$jamfTokenCurl" | $jq -r .token)
+# Read all policy IDs from the file
+policyIDs=()
+while IFS= read -r id1; do
+  # Remove spaces from the ID
+  id1=$(echo $id1 | tr -d '[:space:]')
+  policyIDs+=($id1)
+done < "/Users/mh286/Downloads/Pakages1.csv"
 
-    if [ -z "$jamfBearerToken" ]; then
-        echo "Failed to obtain bearer token. Exiting."
-        exit 1
-    else
-        echo "Bearer token obtained successfully."
-    fi
+echo "Starting to process Package IDs..."
 
-    # Read all policy IDs from the file
-    policyIDs=()
-    while IFS= read -r id1; do
-        # Remove spaces from the ID
-        id1=$(echo $id1 | tr -d '[:space:]')
-        policyIDs+=($id1)
-    done < "/Path/to/file.csv"
-
-    echo "Starting to process Package IDs..."
-
-    # Process each policy ID
-    for id2 in "${policyIDs[@]}"; do
-        echo "Deleting Package ID: $id2"
-        response=$(curl -s -X "DELETE" "https://uon.jamfcloud.com/JSSResource/packages/id/$id2" -H 'accept: application/xml' -H "Authorization: Bearer ${jamfBearerToken}")
-        if [ $? -eq 0 ]; then
-            echo "Successfully deleted Package ID: $id2"
-        else
-            echo "Failed to delete Package ID: $id2"
-        fi
-    done
-
-    echo "Completed processing all Package IDs for iteration $i."
-
-    # If it's not the last iteration, wait before running again
-    if [ $i -lt $iterations ]; then
-        echo "Waiting for $waitTime seconds (20 minutes) before the next iteration..."
-        sleep $waitTime
-    fi
+# Process each policy ID
+for id2 in "${policyIDs[@]}"; do
+  echo "Deleting Package ID: $id2"
+  response=$(curl -s -X "DELETE" "https://uon.jamfcloud.com/JSSResource/packages/id/$id2" -H 'accept: application/xml' -H "Authorization: Bearer ${jamfBearerToken}")
+  if [ $? -eq 0 ]; then
+    echo "Successfully deleted Package ID: $id2"
+  else
+    echo "Failed to delete Package ID: $id2"
+  fi
+#  echo "Waiting for 1 seconds before proceeding to the next Package....-"
+#  sleep 1
 done
 
-echo "Completed all iterations. Exiting script."
+echo "Completed processing all Package IDs."
 exit 0
+
